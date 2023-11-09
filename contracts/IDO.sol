@@ -121,7 +121,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     event ReachedSoftCap(uint256 softCap);
     event ReachedHardCap(uint256 hardCap);
 
-    event FinalizeIdoCalled();
+    event FinalizeIdoCalled(uint256 totalRaised);
 
     event Invested(
         address indexed investor,
@@ -181,7 +181,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     }
 
     /*
-     * Pausability functions
+     * Pausability functionality inherited from OpenZeppelin Pausable contract
      */
     function pause() external onlyOwner {
         _pause();
@@ -275,5 +275,39 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         totalRaised += investmentValue;
 
         emit Invested(msg.sender, investmentValue, tokensToBuy);
+    }
+
+    /*
+     * Potential callers:
+     * - A execution of invest() that surpasses the hardcap.
+     * - A Chainlink Automation when the investingPhaseDuration has finished.
+     *
+     * Execution branches:
+     * - If the soft cap has been reached, the IDO is considered successful,
+     *   the Cliff + Vesting Schedule starts and the project owner receives the collected funds.
+     * - If the soft cap has not been reached, the IDO is considered unsuccessful, the collected funds
+     *   are refunded to the investors and the project owner receives all the project tokens back.
+     */
+    function _finalizeIDO() internal whenActive whenNotPaused {
+        if (reachedSoftCap) {
+            state = State.Completed;
+            vestingCliffStart = block.timestamp;
+
+            emit StateCompleted(totalRaised);
+
+            // Transfer the collected native currency to the project owner
+            payable(owner()).transfer(address(this).balance);
+
+            // Transfer the left over project tokens to the project owner
+            uint256 tokenBalance = token.balanceOf(address(this));
+            if (tokenBalance > 0) {
+                token.transfer(owner(), tokenBalance);
+            }
+        } else {
+            // @TBD
+            // _refundInvestors();
+        }
+
+        emit FinalizeIdoCalled(totalRaised);
     }
 }
