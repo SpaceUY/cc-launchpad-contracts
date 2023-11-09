@@ -304,12 +304,16 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
                 token.transfer(owner(), tokenBalance);
             }
         } else {
-            // @TBD
-            // _refundInvestors();
+            // @TBD _refundInvestors();
         }
 
         emit FinalizeIdoCalled(totalRaised);
     }
+
+    /*
+     * @TBD Implement logic to refund investors
+     */
+    function _refundInvestors() internal whenActive whenNotPaused {}
 
     /*
      * Check if the investing phase has finished
@@ -322,8 +326,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     /*
      * Check if a vesting payment is ready to be performed
      */
-
-    function vestingPaymentIsReady() public view returns (bool) {
+    function vestedPeriodicPaymentHasToBeDone() public view returns (bool) {
         // If all the vesting periods have passed, no more payments have to be done
         // @TBD This could be handeled more clearly with a new "VestingFinished" state
         if (vestingPeriodsPassed == vestingTotalPeriods) {
@@ -341,5 +344,40 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
             (vestingPeriodDuration * currentVestingPeriod);
 
         return (block.timestamp >= currentPeriodPayDate);
+    }
+
+    /*
+     * Perform a vesting payment to all the investors
+     */
+    function _vestedPeriodicPayment()
+        internal
+        whenCompleted
+        whenNotPaused
+        nonReentrant
+    {
+        require(
+            vestedPeriodicPaymentHasToBeDone(),
+            "Vested payment is not ready to be done"
+        );
+
+        vestingPeriodsPassed++;
+
+        for (uint256 i = 0; i < investors.length; i++) {
+            // Get the investor information
+            address investor = investors[i];
+            uint256 tokensBought = vestedInvestments[investor]
+                .totalTokensBought;
+
+            // Calculate the amount of tokens to be delivered to the investor
+            uint256 tokensToDeliver = (tokensBought * vestingPeriodPercentage) /
+                100;
+
+            // Update the investor information
+            vestedInvestments[investor].totalTokensClaimed += tokensToDeliver;
+
+            // Pay the investor
+            token.transfer(investor, tokensToDeliver);
+            emit DeliveredVestedTokens(investor, tokensToDeliver);
+        }
     }
 }
