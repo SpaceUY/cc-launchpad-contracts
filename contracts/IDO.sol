@@ -310,4 +310,36 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
 
         emit FinalizeIdoCalled(totalRaised);
     }
+
+    /*
+     * Check if the investing phase has finished
+     */
+    function investingPhaseHasFinished() public view returns (bool) {
+        return (block.timestamp >=
+            investingPhaseStart + investingPhaseDuration);
+    }
+
+    /*
+     * Check if a vesting payment is ready to be performed
+     */
+
+    function vestingPaymentIsReady() public view returns (bool) {
+        // If all the vesting periods have passed, no more payments have to be done
+        // @TBD This could be handeled more clearly with a new "VestingFinished" state
+        if (vestingPeriodsPassed == vestingTotalPeriods) {
+            return false;
+        }
+        uint256 vestingPhaseStart = vestingCliffStart + vestingCliffDuration;
+        uint256 currentVestingPeriod = vestingPeriodsPassed + 1;
+
+        /*
+         * With a Investing Phase of 30 days, Cliff duration of 30 days, and Vesting Periods of 30 days:
+         * - The first payment would be done (Cliff + Vesting Period 1) after the IDO finalization (30 + 30 = 60 days)
+         * - The second payment would be done (Cliff + Vesting Period 1 + Vesting Period 2) after the IDO finalization (90 days)
+         */
+        uint256 currentPeriodPayDate = vestingPhaseStart +
+            (vestingPeriodDuration * currentVestingPeriod);
+
+        return (block.timestamp >= currentPeriodPayDate);
+    }
 }
