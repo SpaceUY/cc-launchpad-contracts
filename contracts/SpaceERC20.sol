@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @title A Capped ERC20 Token for SpaceDev Initiatives
- * @notice Implements a mintable, capped, and burnable ERC20 token.
+ * @title A Capped ERC20 Token for internal SpaceDev use.
+ * @notice Implements a mintable, capped, and burnable ERC20 token with 18 decimals by default.
  * @dev Extends ERC20Capped, ERC20Burnable, and Ownable from OpenZeppelin's contract suite.
  */
 contract SpaceERC20 is ERC20Capped, ERC20Burnable, Ownable {
