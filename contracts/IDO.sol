@@ -171,4 +171,30 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         vestingPeriodPercentage = _vestingPeriodPercentage;
         state = State.Preparing;
     }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    modifier whenPreparing() {
+        require(state == State.Preparing, "IDO is not in Preparing State");
+        _;
+    }
+
+    modifier whenActive() {
+        require(state == State.Active, "IDO is not in Active State");
+        _;
+    }
+
+    modifier whenCompleted() {
+        require(state == State.Completed, "IDO is not in Completed State");
+        _;
+    }
+
+
+    
 }
