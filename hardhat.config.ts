@@ -1,8 +1,5 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-chai-matchers";
-import "solidity-coverage";
-import "hardhat-gas-reporter";
 
 import * as dotenv from "dotenv";
 dotenv.config();
