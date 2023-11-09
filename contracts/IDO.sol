@@ -114,27 +114,35 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     /*
      * Events to keep track of important IDO state changes and transactions
      */
-    event StateActive(uint256 totalTokensReceived);
+    event StateActive(uint256 totalTokensFunded);
     event StateCompleted(uint256 totalRaised);
-    event StateRefunded(uint256 totalRaised);
+    event StateRefunded(uint256 totalRefunded);
 
     event ReachedSoftCap(uint256 softCap);
     event ReachedHardCap(uint256 hardCap);
 
-    event FinalizeIdoCalled(uint256 totalRaised);
+    event FinalizeIdoCalled();
 
     event Invested(
         address indexed investor,
-        uint256 amount,
-        uint256 tokensBought
-    );
-    event DeliveredVestedTokens(address indexed investor, uint256 amount);
-    event Refunded(
-        address indexed investor,
-        uint256 amount,
+        uint256 contribution,
         uint256 tokensBought
     );
 
+    event DeliveredVestedTokens(
+        address indexed investor,
+        uint256 tokensDelivered
+    );
+
+    event Refunded(
+        address indexed investor,
+        uint256 contribution,
+        uint256 tokensBought
+    );
+
+    /*
+     * Constructor function
+     */
     constructor(
         address _tokenAddress,
         uint256 _tokenPrice,
@@ -172,6 +180,9 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         state = State.Preparing;
     }
 
+    /*
+     * Pausability functions
+     */
     function pause() external onlyOwner {
         _pause();
     }
@@ -180,6 +191,9 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         _unpause();
     }
 
+    /*
+     * State modifiers to ensure valid states for each function call
+     */
     modifier whenPreparing() {
         require(state == State.Preparing, "IDO is not in Preparing State");
         _;
@@ -195,6 +209,15 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         _;
     }
 
-
-    
+    /*
+     * Start the IDO after the project tokens have been transferred to this contract.
+     * This will set the contract as Active and start the investing phase.
+     */
+    function activateIdo() external whenPreparing onlyOwner {
+        uint256 tokenBalance = token.balanceOf(address(this));
+        require(tokenBalance > 0, "IDO contract has no tokens to sell");
+        state = State.Active;
+        investingPhaseStart = block.timestamp;
+        emit StateActive(tokenBalance);
+    }
 }
