@@ -220,4 +220,60 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         investingPhaseStart = block.timestamp;
         emit StateActive(tokenBalance);
     }
+
+    /*
+     * This first version of the investing function works with native currency contributions.
+     * The investor executes this method, and receives the corresponding amount of tokens following the Vesting Schedule.
+     * @TBD: Accept ERC20 tokens as contributions.
+     * @TBD: Accept Multi-Chain ERC20 contributions, thanks to Chainlink CCIP
+     */
+    function invest() external payable whenActive whenNotPaused nonReentrant {
+        uint256 investmentValue = msg.value;
+
+        require(
+            investmentValue >= minContribution &&
+                investmentValue <= maxContribution,
+            "Investment amount out of permitted range"
+        );
+
+        require(
+            vestedInvestments[msg.sender].totalContribution + investmentValue <=
+                maxContribution,
+            "New total contribution exceeds personal limit"
+        );
+
+        if (!reachedSoftCap && totalRaised + investmentValue >= softCap) {
+            reachedSoftCap = true;
+            emit ReachedSoftCap(softCap);
+        }
+
+        if (!reachedHardCap && totalRaised + investmentValue >= hardCap) {
+            reachedHardCap = true;
+            emit ReachedHardCap(hardCap);
+
+            // Refund the excess amount to the investor
+            uint256 excessValue = totalRaised + investmentValue - hardCap;
+            investmentValue = investmentValue - excessValue;
+            payable(msg.sender).transfer(excessValue);
+
+            // _finalizeIdo();
+        }
+
+        uint256 tokensToBuy = investmentValue / tokenPrice;
+
+        require(
+            token.balanceOf(address(this)) >= tokensToBuy,
+            "Not enough tokens in the contract to process the investment"
+        );
+
+        if (vestedInvestments[msg.sender].totalContribution == 0) {
+            investors.push(msg.sender);
+        }
+
+        vestedInvestments[msg.sender].totalContribution += investmentValue;
+        vestedInvestments[msg.sender].totalTokensBought += tokensToBuy;
+        totalRaised += investmentValue;
+
+        emit Invested(msg.sender, investmentValue, tokensToBuy);
+    }
 }
