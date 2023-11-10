@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
 
 contract IDO is Pausable, Ownable, ReentrancyGuard {
     /*
@@ -50,6 +51,11 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
      * Amount of native currency raised in the IDO. This is the sum of all the contributions made by all the investors.
      */
     uint256 public totalRaised;
+
+    /*
+     * Amount of tokens bought in the IDO. This is the sum of all the tokens bought by all the investors, that will be vested.
+     */
+    uint256 public totalTokensBought;
 
     /*
      * Structure to hold the information of each investor contribution
@@ -255,14 +261,12 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
             uint256 excessValue = totalRaised + investmentValue - hardCap;
             investmentValue = investmentValue - excessValue;
             payable(msg.sender).transfer(excessValue);
-
-            // _finalizeIdo();
         }
 
         uint256 tokensToBuy = investmentValue / tokenPrice;
 
         require(
-            token.balanceOf(address(this)) >= tokensToBuy,
+            token.balanceOf(address(this)) >= totalTokensBought + tokensToBuy,
             "Not enough tokens in the contract to process the investment"
         );
 
@@ -273,8 +277,17 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         vestedInvestments[msg.sender].totalContribution += investmentValue;
         vestedInvestments[msg.sender].totalTokensBought += tokensToBuy;
         totalRaised += investmentValue;
+        totalTokensBought += tokensToBuy;
 
         emit Invested(msg.sender, investmentValue, tokensToBuy);
+
+        /*
+         * This is executed down there instead of the above if(reachedHardCap)
+         * In order to perform the transaction to the last investor before the IDO is finalized
+         */
+        if (reachedHardCap) {
+            _finalizeIDO();
+        }
     }
 
     /*
@@ -299,21 +312,66 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
             payable(owner()).transfer(address(this).balance);
 
             // Transfer the left over project tokens to the project owner
-            uint256 tokenBalance = token.balanceOf(address(this));
-            if (tokenBalance > 0) {
-                token.transfer(owner(), tokenBalance);
+            uint256 unsellTokens = remainingTokensAtSell();
+            if (unsellTokens > 0) {
+                token.transfer(owner(), unsellTokens);
             }
+        } else if (investingPhaseHasFinished()) {
+            _refundInvestors();
         } else {
-            // @TBD _refundInvestors();
+            revert("IDO is not ready to be finalized");
         }
 
         emit FinalizeIdoCalled(totalRaised);
     }
 
     /*
-     * @TBD Implement logic to refund investors
+     * Refund all investors, intensive operation, performed by the Chainlink Keeper through _finalizeIDO() call.
      */
-    function _refundInvestors() internal whenActive whenNotPaused {}
+    function _refundInvestors() internal {
+        for (uint i = 0; i < investors.length; i++) {
+            // Get the investor information
+            address investor = investors[i];
+            uint256 refundValue = vestedInvestments[investor].totalContribution;
+            uint256 refundTokens = vestedInvestments[investor]
+                .totalTokensBought;
+
+            // Reset the investor investment
+            vestedInvestments[investor].totalContribution = 0;
+            vestedInvestments[investor].totalTokensBought = 0;
+
+            // Refund the investor
+            payable(investor).transfer(refundValue);
+            emit Refunded(investor, refundValue, refundTokens);
+        }
+
+        // Return tokens to the project owner
+        token.transfer(owner(), token.balanceOf(address(this)));
+
+        // Mark the IDO as refunded
+        state = State.Refunded;
+        emit StateRefunded(totalRaised);
+    }
+
+    /*
+     * Check the remaining tokens at sell on the IDO Contract
+     * This is used to ensure we don't oversell prior to the Vesting Schedule
+     */
+    function remainingTokensAtSell() public view returns (uint256) {
+        uint tokenBalance = token.balanceOf(address(this));
+        /*
+         * If this function is called after the IDO has finalized, the token balance will be 0
+         * As the tokenBalance has been fully withdrawn by the project owner
+         */
+        if (
+            tokenBalance >= totalTokensBought &&
+            tokenBalance - totalTokensBought > 0
+        ) {
+            return tokenBalance - totalTokensBought;
+        } else {
+            return 0;
+        }
+    }
 
     /*
      * Check if the investing phase has finished
@@ -378,6 +436,41 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
             // Pay the investor
             token.transfer(investor, tokensToDeliver);
             emit DeliveredVestedTokens(investor, tokensToDeliver);
+        }
+    }
+
+    /*
+     * We Implement Chainlink Automation with three main objetives
+     * 1. To automatically call _finalizeIDO() when the investingPhaseDuration has finished
+     * 2. This would include refunding users
+     * 3. To automatically deliver the vested tokens on the vestedPeriods
+     */
+    function checkUpkeep(
+        bytes calldata /* checkData */
+    ) external view returns (bool upkeepNeeded) {
+        // 1. Check if the IDO is in Active state and the investingPhaseDuration has finished
+        if (state == State.Active) {
+            return investingPhaseHasFinished();
+        }
+        // 2. Check if the IDO is in Complete state and the vestingPeriodDuration has finished
+        else if (state == State.Completed) {
+            return vestedPeriodicPaymentHasToBeDone();
+        } else {
+            return false;
+        }
+    }
+
+    function performUpkeep(bytes calldata /* performData */) external {
+        // 1. Check if the IDO is in Active state and the investingPhaseDuration has finished
+        if (state == State.Active && investingPhaseHasFinished()) {
+            _finalizeIDO();
+            // 2. Check if the IDO is in Complete, then proceed with the token distribution.
+        } else if (
+            state == State.Completed && vestedPeriodicPaymentHasToBeDone()
+        ) {
+            _vestedPeriodicPayment();
+        } else {
+            revert("No ukpeeep needed");
         }
     }
 }
