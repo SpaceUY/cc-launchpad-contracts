@@ -1,12 +1,13 @@
+import { parseEther } from "ethers";
 import hre from "hardhat";
 
 async function main() {
-  const initialCap = 1000000; // 1 million tokens in wei
-  const spaceERC20 = await hre.ethers.deployContract("SpaceERC20", [initialCap], {});
+  const cap = parseEther("1000000"); // 1 million tokens in wei
+  const spaceERC20 = await hre.ethers.deployContract("SpaceERC20", [cap], {});
 
   await spaceERC20.waitForDeployment();
 
-  console.log(`TestERC20 deployed to ${spaceERC20.target} with cap ${initialCap}`);
+  console.log(`TestERC20 deployed to ${spaceERC20.target} with cap ${cap}`);
 }
 
 main()

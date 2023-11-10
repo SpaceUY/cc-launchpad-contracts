@@ -31,7 +31,7 @@ export interface IDOParamsConstructor {
 export const spaceERC20ParamsArray = [/* _cap */ 1000000]; // 1M tokens
 
 export const idoParamsObj: IDOParams = {
-  _tokenAddress: "0xc0f2B485cFe95B3A1df92dA2966EeB46857fe2a6",
+  _tokenAddress: "",
   _tokenPrice: parseEther("0.001"), // Price in ETH, around 2usd
   _minContribution: parseEther("0.001"), // 1 token
   _maxContribution: parseEther("5"), // 5000 tokens
@@ -61,14 +61,4 @@ export const idoParamsArray = [
 export const HIGHER_MAX_CONTRIBUTION = parseEther("1000"); // double of the hard cap
 export const MINT_TOKENS = 500000; // 500k tokens, same as hard cap
 
-// Params for Remix deployment & testing
-// 0xc0f2B485cFe95B3A1df92dA2966EeB46857fe2a6, 1000, 100000, 100000, 100000, 100000, 30,30, 10, 30, 10
-
-// AVAILABLE TOKENS 500000n
-// TOTAL TOKENS BOUGHT 0n
-
-// hardCap 500000000000000000000n
-// minContribution 1000000000000000n
-
-// AVAILABLE TOKENS 500000n
-// TOTAL TOKENS BOUGHT 499999n
+// npx hardhat verify --network mumbai 0xEBBB3A3281cE7956EFEc3fC4695a5ED87A3aaD54 0x5d5692EFD06118A4B1691fc50AcEc60D8Bc27c28 "1000000000000000" "1000000000000000" "5000000000000000000" "100000000000000000000" "500000000000000000000" "30" "30" "10" "30" "10"
