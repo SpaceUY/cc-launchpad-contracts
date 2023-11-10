@@ -542,7 +542,7 @@ describe("IDO", function () {
           // after fixture.ido.performUpkeep("0x") and this would fail.
           await time.increase(investingPhaseInSeconds - 2);
 
-          const investingPhaseHasFinished = await fixture.ido.investingPhaseHasFinished();
+          const investingPhaseHasFinished = await fixture.ido.investingPhaseShouldFinish();
           expect(investingPhaseHasFinished).to.equal(false);
 
           await expect(fixture.ido.performUpkeep("0x")).to.be.revertedWith("No ukpeeep needed");
@@ -553,7 +553,7 @@ describe("IDO", function () {
           await time.increase(investingPhaseInSeconds);
 
           expect(await fixture.ido.state()).to.equal(1);
-          const investingPhaseHasFinished2 = await fixture.ido.investingPhaseHasFinished();
+          const investingPhaseHasFinished2 = await fixture.ido.investingPhaseShouldFinish();
           expect(investingPhaseHasFinished2).to.equal(true);
 
           await expect(await fixture.ido.performUpkeep("0x")).to.emit(

@@ -316,7 +316,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
             if (unsellTokens > 0) {
                 token.transfer(owner(), unsellTokens);
             }
-        } else if (investingPhaseHasFinished()) {
+        } else if (investingPhaseShouldFinish()) {
             _refundInvestors();
         } else {
             revert("IDO is not ready to be finalized");
@@ -374,17 +374,23 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     }
 
     /*
-     * Check if the investing phase has finished
+     * Check if the investing phase should finish
      */
-    function investingPhaseHasFinished() public view returns (bool) {
-        return (block.timestamp >=
-            investingPhaseStart + investingPhaseDuration);
+    function investingPhaseShouldFinish() public view returns (bool) {
+        if (state != State.Active) {
+            return false;
+        }
+        return block.timestamp >= investingPhaseStart + investingPhaseDuration;
     }
 
     /*
      * Check if a vesting payment is ready to be performed
      */
     function vestedPeriodicPaymentHasToBeDone() public view returns (bool) {
+        if (state != State.Completed) {
+            return false;
+        }
+
         // If all the vesting periods have passed, no more payments have to be done
         // @TBD This could be handeled more clearly with a new "VestingFinished" state
         if (vestingPeriodsPassed == vestingTotalPeriods) {
@@ -449,25 +455,17 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         bytes calldata /* checkData */
     ) external view returns (bool upkeepNeeded) {
         // 1. Check if the IDO is in Active state and the investingPhaseDuration has finished
-        if (state == State.Active) {
-            return investingPhaseHasFinished();
-        }
         // 2. Check if the IDO is in Complete state and the vestingPeriodDuration has finished
-        else if (state == State.Completed) {
-            return vestedPeriodicPaymentHasToBeDone();
-        } else {
-            return false;
-        }
+        return
+            investingPhaseShouldFinish() || vestedPeriodicPaymentHasToBeDone();
     }
 
     function performUpkeep(bytes calldata /* performData */) external {
         // 1. Check if the IDO is in Active state and the investingPhaseDuration has finished
-        if (state == State.Active && investingPhaseHasFinished()) {
+        if (investingPhaseShouldFinish()) {
             _finalizeIDO();
             // 2. Check if the IDO is in Complete, then proceed with the token distribution.
-        } else if (
-            state == State.Completed && vestedPeriodicPaymentHasToBeDone()
-        ) {
+        } else if (vestedPeriodicPaymentHasToBeDone()) {
             _vestedPeriodicPayment();
         } else {
             revert("No ukpeeep needed");
