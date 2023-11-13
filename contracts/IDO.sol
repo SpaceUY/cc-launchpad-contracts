@@ -36,7 +36,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
 
     /*
      * The hard cap is the absolute maximum amount the project wants to raise. Once the IDO reaches this amount,
-     * it will call the finalizeIdo() function and the IDO will be considered successful.
+     * it will call the finalizeInvestingPhase() function and the IDO will be considered successful.
      */
     uint256 public hardCap;
     bool public reachedHardCap;
@@ -89,7 +89,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     /*
      * - cliffDuration: Duration in days after which the vesting starts
      * - cliffStart: Date from which the cliffDuration is calculated (IDO finalization with totalRaised >= softCap)
-     * - vestingPeriodsPassed: Number of vesting periods passed
+     * - vestingPeriodsPaid: Number of vesting periods paid
      * - vestingTotalPeriods: Total number of vesting periods
      * - vestingPeriodDuration: Duration in days of each vesting period
      * - vestingPeriodPercentage: Percentage of tokens to be vested in each vesting period
@@ -97,7 +97,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
      */
     uint256 public vestingCliffDuration;
     uint256 public vestingCliffStart;
-    uint256 public vestingPeriodsPassed;
+    uint256 public vestingPeriodsPaid;
     uint256 public vestingTotalPeriods;
     uint256 public vestingPeriodDuration;
     uint256 public vestingPeriodPercentage;
@@ -113,6 +113,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         Preparing,
         Active,
         Refunded,
+        Vesting,
         Completed
     }
     State public state;
@@ -121,13 +122,14 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
      * Events to keep track of important IDO state changes and transactions
      */
     event StateActive(uint256 totalTokensFunded);
-    event StateCompleted(uint256 totalRaised);
     event StateRefunded(uint256 totalRefunded);
+    event StateVesting(uint256 totalTokensBought);
+    event StateCompleted(uint256 totalRaised);
 
     event ReachedSoftCap(uint256 softCap);
     event ReachedHardCap(uint256 hardCap);
 
-    event FinalizeIdoCalled(uint256 totalRaised);
+    event FinalizeInvestingPhaseCalled(uint256 totalRaised);
 
     event Invested(
         address indexed investor,
@@ -210,8 +212,8 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         _;
     }
 
-    modifier whenCompleted() {
-        require(state == State.Completed, "IDO is not in Completed State");
+    modifier whenVesting() {
+        require(state == State.Vesting, "IDO is not in Vesting State");
         _;
     }
 
@@ -286,7 +288,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
          * In order to perform the transaction to the last investor before the IDO is finalized
          */
         if (reachedHardCap) {
-            _finalizeIDO();
+            _finalizeInvestingPhase();
         }
     }
 
@@ -301,12 +303,12 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
      * - If the soft cap has not been reached, the IDO is considered unsuccessful, the collected funds
      *   are refunded to the investors and the project owner receives all the project tokens back.
      */
-    function _finalizeIDO() internal whenActive whenNotPaused {
+    function _finalizeInvestingPhase() internal whenActive {
         if (reachedSoftCap) {
-            state = State.Completed;
+            state = State.Vesting;
             vestingCliffStart = block.timestamp;
 
-            emit StateCompleted(totalRaised);
+            emit StateVesting(totalTokensBought);
 
             // Transfer the collected native currency to the project owner
             payable(owner()).transfer(address(this).balance);
@@ -319,16 +321,16 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         } else if (investingPhaseShouldFinish()) {
             _refundInvestors();
         } else {
-            revert("IDO is not ready to be finalized");
+            revert("Investing Phase is not ready to be finalized");
         }
 
-        emit FinalizeIdoCalled(totalRaised);
+        emit FinalizeInvestingPhaseCalled(totalRaised);
     }
 
     /*
-     * Refund all investors, intensive operation, performed by the Chainlink Keeper through _finalizeIDO() call.
+     * Refund all investors, intensive operation, performed by the Chainlink Keeper through _finalizeInvestingPhase() call.
      */
-    function _refundInvestors() internal {
+    function _refundInvestors() internal whenActive {
         for (uint i = 0; i < investors.length; i++) {
             // Get the investor information
             address investor = investors[i];
@@ -387,17 +389,17 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
      * Check if a vesting payment is ready to be performed
      */
     function vestedPeriodicPaymentHasToBeDone() public view returns (bool) {
-        if (state != State.Completed) {
+        if (state != State.Vesting) {
             return false;
         }
 
         // If all the vesting periods have passed, no more payments have to be done
         // @TBD This could be handeled more clearly with a new "VestingFinished" state
-        if (vestingPeriodsPassed == vestingTotalPeriods) {
+        if (vestingPeriodsPaid == vestingTotalPeriods) {
             return false;
         }
         uint256 vestingPhaseStart = vestingCliffStart + vestingCliffDuration;
-        uint256 currentVestingPeriod = vestingPeriodsPassed + 1;
+        uint256 currentVestingPeriod = vestingPeriodsPaid + 1;
 
         /*
          * With a Investing Phase of 30 days, Cliff duration of 30 days, and Vesting Periods of 30 days:
@@ -413,18 +415,13 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     /*
      * Perform a vesting payment to all the investors
      */
-    function _vestedPeriodicPayment()
-        internal
-        whenCompleted
-        whenNotPaused
-        nonReentrant
-    {
+    function _vestedPeriodicPayment() internal whenVesting nonReentrant {
         require(
             vestedPeriodicPaymentHasToBeDone(),
             "Vested payment is not ready to be done"
         );
 
-        vestingPeriodsPassed++;
+        vestingPeriodsPaid++;
 
         for (uint256 i = 0; i < investors.length; i++) {
             // Get the investor information
@@ -443,11 +440,17 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
             token.transfer(investor, tokensToDeliver);
             emit DeliveredVestedTokens(investor, tokensToDeliver);
         }
+
+        // If all the vesting periods have passed, the IDO is considered completed
+        if (vestingPeriodsPaid == vestingTotalPeriods) {
+            state = State.Completed;
+            emit StateCompleted(totalRaised);
+        }
     }
 
     /*
      * We Implement Chainlink Automation with three main objetives
-     * 1. To automatically call _finalizeIDO() when the investingPhaseDuration has finished
+     * 1. To automatically call _finalizeInvestingPhase() when the investingPhaseDuration has finished
      * 2. This would include refunding users
      * 3. To automatically deliver the vested tokens on the vestedPeriods
      */
@@ -463,7 +466,7 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
     function performUpkeep(bytes calldata /* performData */) external {
         // 1. Check if the IDO is in Active state and the investingPhaseDuration has finished
         if (investingPhaseShouldFinish()) {
-            _finalizeIDO();
+            _finalizeInvestingPhase();
             // 2. Check if the IDO is in Complete, then proceed with the token distribution.
         } else if (vestedPeriodicPaymentHasToBeDone()) {
             _vestedPeriodicPayment();

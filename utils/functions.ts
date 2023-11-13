@@ -1,7 +1,7 @@
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
-export const daysToSeconds = (days: number): number => {
-  return days * 24 * 60 * 60;
+export const daysToSeconds = (days: number | bigint): bigint => {
+  return BigInt(days) * 24n * 60n * 60n;
 };
 
 export const getCost = async (tx: any): Promise<bigint> => {

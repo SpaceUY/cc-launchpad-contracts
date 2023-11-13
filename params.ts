@@ -7,11 +7,11 @@ export interface IDOParams {
   _maxContribution: bigint;
   _softCap: bigint;
   _hardCap: bigint;
-  _investingPhaseInDays: number;
-  _vestingCliffInDays: number;
-  _vestingTotalPeriods: number;
-  _vestingPeriodInDays: number;
-  _vestingPeriodPercentage: number;
+  _investingPhaseInDays: bigint;
+  _vestingCliffInDays: bigint;
+  _vestingTotalPeriods: bigint;
+  _vestingPeriodInDays: bigint;
+  _vestingPeriodPercentage: bigint;
 }
 
 export interface IDOParamsConstructor {
@@ -21,14 +21,14 @@ export interface IDOParamsConstructor {
   _maxContribution?: bigint;
   _softCap?: bigint;
   _hardCap?: bigint;
-  _investingPhaseInDays?: number;
-  _vestingCliffInDays?: number;
-  _vestingTotalPeriods?: number;
-  _vestingPeriodInDays?: number;
-  _vestingPeriodPercentage?: number;
+  _investingPhaseInDays?: bigint;
+  _vestingCliffInDays?: bigint;
+  _vestingTotalPeriods?: bigint;
+  _vestingPeriodInDays?: bigint;
+  _vestingPeriodPercentage?: bigint;
 }
 
-export const spaceERC20ParamsArray = [/* _cap */ 1000000]; // 1M tokens
+export const spaceERC20ParamsArray = [/* _cap */ parseEther('1000000')]; // 1M tokens
 
 export const idoParamsObj: IDOParams = {
   _tokenAddress: "",
@@ -37,11 +37,11 @@ export const idoParamsObj: IDOParams = {
   _maxContribution: parseEther("5"), // 5000 tokens
   _softCap: parseEther("100"), // 100k tokens
   _hardCap: parseEther("500"), // 500k tokens
-  _investingPhaseInDays: 30,
-  _vestingCliffInDays: 30,
-  _vestingTotalPeriods: 10,
-  _vestingPeriodInDays: 30,
-  _vestingPeriodPercentage: 10,
+  _investingPhaseInDays: 30n,
+  _vestingCliffInDays: 30n,
+  _vestingTotalPeriods: 10n,
+  _vestingPeriodInDays: 30n,
+  _vestingPeriodPercentage: 10n,
 };
 
 export const idoParamsArray = [
@@ -59,6 +59,6 @@ export const idoParamsArray = [
 ];
 
 export const HIGHER_MAX_CONTRIBUTION = parseEther("1000"); // double of the hard cap
-export const MINT_TOKENS = 500000; // 500k tokens, same as hard cap
+export const MINT_TOKENS = parseEther("500000"); // 500k tokens, same as hard cap
 
 // npx hardhat verify --network mumbai 0xEBBB3A3281cE7956EFEc3fC4695a5ED87A3aaD54 0x5d5692EFD06118A4B1691fc50AcEc60D8Bc27c28 "1000000000000000" "1000000000000000" "5000000000000000000" "100000000000000000000" "500000000000000000000" "30" "30" "10" "30" "10"
