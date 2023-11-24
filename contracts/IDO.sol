@@ -292,6 +292,8 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         }
     }
 
+    function _relayInvest(uint256 _fromChain, address _tokenAddress, int256 _amount, uint256 _usdValue) internal {}
+
     /*
      * Potential callers:
      * - A execution of invest() that surpasses the hardcap.
