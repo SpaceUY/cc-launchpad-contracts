@@ -3,12 +3,14 @@ pragma solidity ^0.8.20;
 
 import "./IDO.sol"; // Adjust the path as needed
 
-contract IDOFactory {
+contract IDOFactory is LinkFunder {
     // Event to emit when a new IDO is created
     event IDOCreated(address indexed idoAddress);
 
     // Array to keep track of all created IDOs
     address[] public deployedIDOs;
+
+    constructor(address _linkAddress) LinkFunder(_linkAddress) {}
 
     // Function to create a new IDO
     function createIDO(
@@ -38,6 +40,7 @@ contract IDOFactory {
             _vestingPeriodPercentage
         );
         deployedIDOs.push(address(newIDO));
+        _addFundee(address(newIDO));
         emit IDOCreated(address(newIDO));
     }
 

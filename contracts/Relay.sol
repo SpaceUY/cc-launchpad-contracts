@@ -4,12 +4,12 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
-import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import { UD60x18, ud, intoUint256 } from "@prb/math/UD60x18.sol";
 import {TokenDeposit} from "./TokenDeposit.sol";
+import {LinkFundee} from "./LinkFunds.sol";
 
-contract InvestmentRelayer is Ownable, TokenDeposit {
+contract InvestmentRelayer is Ownable, TokenDeposit, LinkFundee {
 
   struct Token {
     bool allowed;
@@ -18,7 +18,6 @@ contract InvestmentRelayer is Ownable, TokenDeposit {
 
   error DestinationChainNotAllowed(uint64 destinationChainSelector);
   error TokenNotAllowed(address tokenAddress)
-  error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees); 
 
   event TokensTransferred(
     bytes32 indexed messageId,
@@ -36,7 +35,6 @@ contract InvestmentRelayer is Ownable, TokenDeposit {
   mapping(address => Token) public allowedTokens;
 
   IRouterClient router;
-  LinkTokenInterface linkToken;
 
   modifier onlyAllowedChain(uint64 _destinationChainSelector) {
     if (!allowedChains[_destinationChainSelector]) {
@@ -52,8 +50,17 @@ contract InvestmentRelayer is Ownable, TokenDeposit {
     _;
   }
 
-  constructor (address _router, address _link) Ownable(msg.sender) {
-    linkToken = LinkTokenInterface(_link);
+  constructor (
+    address _router,
+    address _linkAddress, 
+    address _linkFunder, 
+    uint64[20] _allowedChains, 
+    address[50] _allowedTokenAddrs, 
+    address[50] _tokenPriceFeedAddrs
+  ) 
+    Ownable(msg.sender)
+    LinkFundee(_linkAddress, _linkFunder)
+  {
     router = IRouterClient(_router);
   }
 
@@ -118,11 +125,7 @@ contract InvestmentRelayer is Ownable, TokenDeposit {
     });
 
     uint256 fees = router.getFee(_destinationChainSelector, message);
-    if (fees > linkToken.balanceOf(address(this)))
-      revert NotEnoughBalance(linkToken.balanceOf(address(this)), fees);
-
-    linkToken.approve(address(router), fees);
-
+    _requestAndApprove(address(router), fees);
     messageId = router.ccipSend(_destinationChainSelector, message);
 
     emit TokensTransferred(
