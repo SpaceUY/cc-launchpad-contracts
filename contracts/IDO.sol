@@ -6,8 +6,9 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
+import { LinkFundee } from "./LinkFunds.sol";
 
-contract IDO is Pausable, Ownable, ReentrancyGuard {
+contract IDO is LinkFundee, Pausable, Ownable, ReentrancyGuard {
     /*
      * ERC20 token to be sold, this IDO contract will receive the those tokens to be sold
      * This receiving transaction is expected to be done before the IDO starts, by the token owner
@@ -152,6 +153,9 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
      * Constructor function
      */
     constructor(
+        address _router,
+        address _linkAddress,
+        address _linkFunder,
         address _tokenAddress,
         uint256 _tokenPrice,
         uint256 _minContribution,
@@ -163,7 +167,10 @@ contract IDO is Pausable, Ownable, ReentrancyGuard {
         uint256 _vestingTotalPeriods,
         uint256 _vestingPeriodInDays,
         uint256 _vestingPeriodPercentage
-    ) Ownable(msg.sender) {
+    ) 
+        Ownable(msg.sender)
+        LinkFundee(_linkAddress, _linkFunder)
+    {
         require(_softCap <= _hardCap, "Soft cap should be less than hard cap");
         require(
             _minContribution <= _maxContribution,

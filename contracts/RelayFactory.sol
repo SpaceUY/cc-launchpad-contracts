@@ -19,17 +19,20 @@ contract RelayFactory is LinkFunder {
 
   // Function to create a new Relay
   function createRelay(
-    uint64[20] _allowedChains, 
+    uint64 _idoChain,
+    address _idoAddress, 
     address[50] _allowedTokenAddrs, 
     address[50] _tokenPriceFeedAddrs
   ) 
-    public
+    external
   {
-    IDO newRelay = new Relay(
+    Relay newRelay = new Relay(
       routerAddr,
       address(linkToken),
       address(this),
-      _allowedChains, 
+      _idoChain,
+      _idoAddress,
+      msg.sender, 
       _allowedTokenAddrs, 
       _tokenPriceFeedAddrs
     );
