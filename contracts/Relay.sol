@@ -4,11 +4,13 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {TokenInvestment} from "./TokenInvestment.sol";
 import {LinkFundee} from "./LinkFunds.sol";
 
-contract InvestmentRelayer is Ownable, TokenInvestment, LinkFundee {
+contract InvestmentRelayer is Ownable, TokenInvestment, LinkFundee, CCIPReceiver {
 
   error DestinationChainNotAllowed(uint64 destinationChainSelector);
 
@@ -44,9 +46,9 @@ contract InvestmentRelayer is Ownable, TokenInvestment, LinkFundee {
     address[50] _allowedTokenAddrs, 
     address[50] _tokenPriceFeedAddrs
   ) 
-    Ownable(msg.sender)
+    Ownable(_idoOwner)
     LinkFundee(_linkAddress, _linkFunder)
-    TokenInvestment(_allowedTokenAddrs, _tokenPriceFeedAddrs)
+    TokenInvestment(_idoOwner, _allowedTokenAddrs, _tokenPriceFeedAddrs)
   {
     router = IRouterClient(_router);
     allowedChains[_idoChain] = true;
@@ -69,7 +71,7 @@ contract InvestmentRelayer is Ownable, TokenInvestment, LinkFundee {
     onlyAllowedToken(_tokenAddress)
     returns (bytes32 messageId)
   {
-    uint256 amountDeposited = _deposit();
+    uint256 amountDeposited = _deposit(msg.sender, _tokenAddress, _amount);
     UD60x18 price = _getPriceForToken(_tokenAddress);
     uint8 tokenDecimals = _tokenAddress == address(0) ? 18 : IERC20(_tokenAddress).decimals();
     UD60x18 tokenAmount;
@@ -104,5 +106,16 @@ contract InvestmentRelayer is Ownable, TokenInvestment, LinkFundee {
       intoUint256(investedValue),
       fees
     );   
+  }
+
+  function _ccipReceive(
+    Client.Any2EVMMessage memory any2EvmMessage
+  )
+    internal
+    override
+  {
+    require(any2EvmMessage.sourceChainSelector == idoChain, "Source chain must be IDO chain");
+    require(abi.decode(any2EvmMessage.sender, (address)) == idoAddress, "Sender must be IDO contract");
+    address(this).call(any2EvmMessage.data)
   }
 }
