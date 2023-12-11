@@ -2,6 +2,9 @@
 
 This repository contains the smart contracts for a cross-chain investment platform that leverages Chainlink technology for seamless blockchain investments. The platform is designed to enable project founders to launch Initial DEX Offerings (IDOs) and receive investments across various blockchains.
 
+## Diagram
+![image](https://github.com/SpaceUY/cc-launchpad-contracts/assets/86085168/dfbc4dad-f183-47aa-9b83-2ef0fa6adbdb)
+
 ## Contract Overview
 
 #### IDO.sol
@@ -18,7 +21,6 @@ This file contains a single abstract class TokenInvestment. This contract contai
 This file contains the InvestmentRelayer contract. We wanted to allow investors to contribute to an IDO with tokens in a chain outside of the IDO’s chain. For this, we needed relays that are capable of receiving tokens from a source chain and updating the IDO contract. Originally we had planned on using cross-chain token transfers, but the feature is heavily limited. Instead, we opted to have each relay store the tokens it receives and update the IDO contract with the corresponding amounts. The idea here is that when the IDO is successful, the owner will be able to check the IDO contract to see which relays received funds and call each relay directly to withdraw the funds. This is made possible by two-way communication between relays and the IDO. Due to the fire-and-forget nature of cross-chain messages (we can’t wait for a response to determine if a call was successful or not), care had to be taken to ensure fault tolerance. One such case is when deposited tokens exceed the hard cap, in which case we have the IDO contract send a message to the relay to notify it has to return a certain amount of tokens to the investor.
 
 
-## Diagram
-![image](https://github.com/SpaceUY/cc-launchpad-contracts/assets/86085168/dfbc4dad-f183-47aa-9b83-2ef0fa6adbdb)
+
 
 
